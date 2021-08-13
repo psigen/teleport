@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/gravitational/teleport"
-	"github.com/gravitational/teleport/api/constants"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/auth"
 	"github.com/gravitational/teleport/lib/defaults"
@@ -416,7 +415,7 @@ func TestCompatibilityWithOldAgents(t *testing.T) {
 		Protocol: defaults.ProtocolPostgres,
 		URI:      net.JoinHostPort("localhost", postgresServer.Port()),
 		HostID:   testCtx.hostID,
-		Hostname: constants.APIDomain,
+		Hostname: "host",
 	})
 	require.NoError(t, err)
 	databaseServer := testCtx.setupDatabaseServer(ctx, t, resource)
@@ -743,7 +742,7 @@ func setupTestContext(ctx context.Context, t *testing.T, withDatabases ...withDa
 			Name: testCtx.hostID,
 		}, types.DatabaseServerSpecV3{
 			HostID:   testCtx.hostID,
-			Hostname: constants.APIDomain,
+			Hostname: "host",
 		})
 		require.NoError(t, err)
 		err = resource.SetDatabases(databases)

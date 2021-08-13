@@ -1561,9 +1561,8 @@ func (a *Server) GenerateServerKeys(req GenerateServerKeysRequest) (*PackedKeys,
 		NotAfter:  a.clock.Now().UTC().Add(defaults.CATTL),
 		DNSNames:  append([]string{}, req.AdditionalPrincipals...),
 	}
-	// HTTPS requests need to specify DNS name that should be present in the
-	// certificate as one of the DNS Names. It is not known in advance,
-	// that is why there is a default one for all certificates
+	// API requests need to specify a DNS name, which must be present in the certificate's DNS Names.
+	// The target DNS is not always known in advance so we add a default one to all certificates.
 	if req.Roles.Include(types.RoleAuth) || req.Roles.Include(types.RoleAdmin) || req.Roles.Include(types.RoleProxy) || req.Roles.Include(types.RoleKube) || req.Roles.Include(types.RoleApp) {
 		certRequest.DNSNames = append(certRequest.DNSNames, "*."+constants.APIDomain, constants.APIDomain)
 	}
