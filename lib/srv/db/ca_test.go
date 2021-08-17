@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/gravitational/teleport/api/constants"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/fixtures"
@@ -117,7 +118,7 @@ func TestInitCACert(t *testing.T) {
 		Name: testCtx.hostID,
 	}, types.DatabaseServerSpecV3{
 		HostID:    testCtx.hostID,
-		Hostname:  "host",
+		Hostname:  constants.APIDomain,
 		Databases: allDatabases,
 	})
 	require.NoError(t, err)
@@ -155,7 +156,7 @@ func TestInitCACertCaching(t *testing.T) {
 		Name: testCtx.hostID,
 	}, types.DatabaseServerSpecV3{
 		HostID:    testCtx.hostID,
-		Hostname:  "host",
+		Hostname:  constants.APIDomain,
 		Databases: []*types.DatabaseV3{rds},
 	})
 	require.NoError(t, err)

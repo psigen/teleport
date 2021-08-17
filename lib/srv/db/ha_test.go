@@ -22,6 +22,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/gravitational/teleport/api/constants"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/teleport/lib/defaults"
 	"github.com/gravitational/teleport/lib/srv/db/common"
@@ -58,7 +59,7 @@ func TestHA(t *testing.T) {
 		Name: offlineHostID,
 	}, types.DatabaseServerSpecV3{
 		HostID:    offlineHostID,
-		Hostname:  "host",
+		Hostname:  constants.APIDomain,
 		Databases: []*types.DatabaseV3{offlineDB},
 	})
 	require.NoError(t, err)
@@ -80,7 +81,7 @@ func TestHA(t *testing.T) {
 		Name: onlineHostID,
 	}, types.DatabaseServerSpecV3{
 		HostID:    onlineHostID,
-		Hostname:  "host",
+		Hostname:  constants.APIDomain,
 		Databases: []*types.DatabaseV3{onlineDB},
 	})
 	require.NoError(t, err)
