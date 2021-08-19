@@ -240,6 +240,10 @@
         {
           "title": "FedRAMP",
           "slug": "/enterprise/fedramp/"
+        },
+        {
+          "title": "HSM",
+          "slug": "/enterprise/hsm/"
         }
       ]
     },
