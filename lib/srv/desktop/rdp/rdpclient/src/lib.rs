@@ -1,5 +1,10 @@
+pub mod rdpdr;
+
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate num_derive;
+extern crate byteorder;
 
 use libc::{fd_set, select, FD_SET};
 use rdp::core::event::*;
@@ -144,7 +149,7 @@ fn connect_rdp_inner(
         screen_width,
         screen_height,
         KeyboardLayout::US,
-        vec!["rdpdr".to_string()],
+        vec!["rdpdr".to_string(), "rdpsnd".to_string()],
     )?;
     sec::connect(&mut mcs, &domain, &username, &password, false)?;
     let global = global::Client::new(
@@ -155,10 +160,11 @@ fn connect_rdp_inner(
         KeyboardLayout::US,
         "rdp-rs",
     );
+    let rdpdr = rdpdr::Client::new();
 
     // TODO(awly): smartcard authentication over rdpdr channel goes here.
 
-    let rdp_client = RdpClient { mcs, global };
+    let rdp_client = RdpClient { mcs, global, rdpdr };
 
     Ok(Client {
         rdp_client: Arc::new(Mutex::new(rdp_client)),
@@ -166,9 +172,11 @@ fn connect_rdp_inner(
     })
 }
 
+// From rdp-rs/src/core/client.rs
 struct RdpClient<S> {
     mcs: mcs::Client<S>,
     global: global::Client,
+    rdpdr: rdpdr::Client,
 }
 
 impl<S: Read + Write> RdpClient<S> {
@@ -179,6 +187,7 @@ impl<S: Read + Write> RdpClient<S> {
         let (channel_name, message) = self.mcs.read()?;
         match channel_name.as_str() {
             "global" => self.global.read(message, &mut self.mcs, callback),
+            "rdpdr" => self.rdpdr.read(message, &mut self.mcs),
             _ => Err(RdpError::RdpError(RdpProtocolError::new(
                 RdpErrorKind::UnexpectedType,
                 &format!("Invalid channel name {:?}", channel_name),
