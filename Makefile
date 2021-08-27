@@ -513,8 +513,6 @@ lint-helm:
 
 ADDLICENSE := $(GOPATH)/bin/addlicense
 ADDLICENSE_ARGS := -c 'Gravitational, Inc' -l apache \
-		-ignore '**/*.c' \
-		-ignore '**/*.h' \
 		-ignore '**/*.html' \
 		-ignore '**/*.js' \
 		-ignore '**/*.proto' \
