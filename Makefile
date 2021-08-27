@@ -513,7 +513,6 @@ lint-helm:
 
 ADDLICENSE := $(GOPATH)/bin/addlicense
 ADDLICENSE_ARGS := -c 'Gravitational, Inc' -l apache \
-		-ignore '**/Dockerfile' \
 		-ignore 'api/version.go' \
 		-ignore 'e/**' \
 		-ignore 'gitref.go' \
