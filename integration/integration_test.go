@@ -203,6 +203,8 @@ func TestIntegrations(t *testing.T) {
 	t.Run("RotateSuccess", suite.bind(testRotateSuccess))
 	t.Run("RotateTrustedClusters", suite.bind(testRotateTrustedClusters))
 	t.Run("SessionStartContainsAccessRequest", suite.bind(testSessionStartContainsAccessRequest))
+	t.Run("SessionStreaming", suite.bind(testSessionStreaming))
+	t.Run("SSHExitCode", suite.bind(testSSHExitCode))
 	t.Run("Shutdown", suite.bind(testShutdown))
 	t.Run("TrustedClusters", suite.bind(testTrustedClusters))
 	t.Run("TrustedClustersWithLabels", suite.bind(testTrustedClustersWithLabels))
@@ -211,7 +213,6 @@ func TestIntegrations(t *testing.T) {
 	t.Run("TwoClustersTunnel", suite.bind(testTwoClustersTunnel))
 	t.Run("UUIDBasedProxy", suite.bind(testUUIDBasedProxy))
 	t.Run("WindowChange", suite.bind(testWindowChange))
-	t.Run("SessionStreaming", suite.bind(testSessionStreaming))
 }
 
 // testAuditOn creates a live session, records a bunch of data through it
@@ -4753,6 +4754,138 @@ func testBPFExec(t *testing.T, suite *integrationTestSuite) {
 			} else {
 				_, err = findCommandEventInLog(main, events.SessionCommandEvent, lsPath)
 				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func testSSHExitCode(t *testing.T, suite *integrationTestSuite) {
+	lsPath, err := exec.LookPath("ls")
+	require.NoError(t, err)
+
+	var tests = []struct {
+		desc           string
+		command        []string
+		input          string
+		interactive    bool
+		errorAssertion require.ErrorAssertionFunc
+		statusCode     int
+	}{
+		// A successful noninteractive session should have a zero status code
+		{
+			desc:           "Run Command and Exit Successfully",
+			command:        []string{lsPath},
+			interactive:    false,
+			errorAssertion: require.NoError,
+			statusCode:     0,
+		},
+		// A failed noninteractive session should have a non-zero status code
+		{
+			desc:           "Run Command and Fail With Code 2",
+			command:        []string{"exit 2"},
+			interactive:    false,
+			errorAssertion: require.Error,
+			statusCode:     2,
+		},
+		// A failed interactive session should have a non-zero status code
+		{
+			desc:           "Run Command Interactively and Fail With Code 2",
+			command:        []string{"exit 2"},
+			interactive:    true,
+			errorAssertion: require.Error,
+			statusCode:     2,
+		},
+		// A failed interactive session should have a non-zero status code
+		{
+			desc:           "Interactively Fail With Code 3",
+			input:          "exit 3\n\r",
+			interactive:    true,
+			errorAssertion: require.Error,
+			statusCode:     3,
+		},
+		// A successful interactive session should have a zero status code
+		{
+			desc:           "Interactively Exist Successfully",
+			input:          fmt.Sprintf("%v\n\rexit\n\r", lsPath),
+			interactive:    true,
+			errorAssertion: require.NoError,
+			statusCode:     0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// Create and start a Teleport cluster.
+			makeConfig := func() (*testing.T, []string, []*InstanceSecrets, *service.Config) {
+				// Create default config.
+				tconf := suite.defaultServiceConfig()
+
+				// Configure Auth.
+				tconf.Auth.Preference.SetSecondFactor("off")
+				tconf.Auth.Enabled = true
+				tconf.Auth.NoAudit = true
+
+				// Configure Proxy.
+				tconf.Proxy.Enabled = true
+				tconf.Proxy.DisableWebService = false
+				tconf.Proxy.DisableWebInterface = true
+
+				// Configure Node.
+				tconf.SSH.Enabled = true
+				return t, nil, nil, tconf
+			}
+			main := suite.newTeleportWithConfig(makeConfig())
+			defer main.StopAll()
+
+			// context to signal when the client is done with the terminal.
+			failedContext, failedCancel := context.WithTimeout(context.Background(), time.Second*10)
+			defer failedCancel()
+			doneContext, doneCancel := context.WithCancel(context.Background())
+
+			go func() {
+				cli, err := main.NewClient(t, ClientConfig{
+					Login:       suite.me.Username,
+					Cluster:     Site,
+					Host:        Host,
+					Port:        main.GetPortSSHInt(),
+					Interactive: tt.interactive,
+				})
+				require.NoError(t, err)
+
+				if tt.interactive {
+					// Create a new terminal and connect it to std{in,out} of client.
+					term := NewTerminal(250)
+					cli.Stdout = term
+					cli.Stdin = term
+					term.Type(tt.input)
+				}
+
+				err = cli.SSH(doneContext, tt.command, false)
+				if err == nil && tt.statusCode != 0 {
+					t.Errorf("ssh session exited with status code 0. expected to receive status code %d", tt.statusCode)
+					return
+				}
+				tt.errorAssertion(t, err)
+
+				//check that the exit code of the session matches the expected one
+				if err != nil {
+					exitError, ok := trace.Unwrap(err).(*ssh.ExitError)
+					require.True(t, ok)
+					require.Equal(t, tt.statusCode, exitError.ExitStatus())
+				}
+
+				// Signal that the client has finished the interactive session.
+				doneCancel()
+			}()
+
+			for {
+				// Wait for either the session to finish or the timeout to occur
+				select {
+				case <-doneContext.Done():
+					return
+				case <-failedContext.Done():
+					require.NoError(t, failedContext.Err(), "Timed out waiting for session to complete")
+				}
 			}
 		})
 	}
